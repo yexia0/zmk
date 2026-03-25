@@ -74,6 +74,11 @@ struct combo_cfg *combo_lookup[ZMK_KEYMAP_LEN][CONFIG_ZMK_COMBO_MAX_COMBOS_PER_K
 struct active_combo active_combos[CONFIG_ZMK_COMBO_MAX_PRESSED_COMBOS] = {NULL};
 int active_combo_count = 0;
 
+__attribute__((weak)) bool zmk_behavior_hold_tap_position_is_active(uint32_t position) {
+    (void)position;
+    return false;
+}
+
 struct k_work_delayable timeout_task;
 int64_t timeout_task_timeout_at;
 
@@ -478,7 +483,10 @@ static int position_state_down(const zmk_event_t *ev, struct zmk_position_state_
 }
 
 static int position_state_up(const zmk_event_t *ev, struct zmk_position_state_changed *data) {
-    if (is_key_part_of_candidate(data->position)) {
+    bool should_cleanup = is_key_part_of_candidate(data->position) ||
+                          zmk_behavior_hold_tap_position_is_active(data->position);
+
+    if (should_cleanup) {
         int released_keys = cleanup();
 
         if (release_combo_key(data->position, data->timestamp)) {

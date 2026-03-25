@@ -252,6 +252,10 @@ static struct active_hold_tap *find_hold_tap(uint32_t position) {
     return NULL;
 }
 
+bool zmk_behavior_hold_tap_position_is_active(uint32_t position) {
+    return find_hold_tap(position) != NULL;
+}
+
 static struct active_hold_tap *store_hold_tap(struct zmk_behavior_binding_event *event,
                                               uint32_t param_hold, uint32_t param_tap,
                                               const struct behavior_hold_tap_config *config) {
