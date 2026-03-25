@@ -400,6 +400,24 @@ static bool release_combo_key(int32_t position, int64_t timestamp) {
     return false;
 }
 
+static bool is_key_part_of_candidate(int32_t position) {
+    for (int i = 0; i < CONFIG_ZMK_COMBO_MAX_COMBOS_PER_KEY; i++) {
+        struct combo_candidate *candidate = &candidates[i];
+
+        if (candidate->combo == NULL) {
+            continue;
+        }
+
+        for (int j = 0; j < candidate->combo->key_position_len; j++) {
+            if (candidate->combo->key_positions[j] == position) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 static int cleanup() {
     k_work_cancel_delayable(&timeout_task);
     clear_candidates();
@@ -460,18 +478,25 @@ static int position_state_down(const zmk_event_t *ev, struct zmk_position_state_
 }
 
 static int position_state_up(const zmk_event_t *ev, struct zmk_position_state_changed *data) {
-    int released_keys = cleanup();
-    if (release_combo_key(data->position, data->timestamp)) {
+    if (is_key_part_of_candidate(data->position)) {
+        int released_keys = cleanup();
+
+        if (release_combo_key(data->position, data->timestamp)) {
+            return ZMK_EV_EVENT_HANDLED;
+        }
+
+        if (released_keys > 1) {
+            // The second and further key down events are re-raised. To preserve
+            // correct order for e.g. hold-taps, reraise the key up event too.
+            struct zmk_position_state_changed_event dupe_ev =
+                copy_raised_zmk_position_state_changed(data);
+            ZMK_EVENT_RAISE(dupe_ev);
+            return ZMK_EV_EVENT_CAPTURED;
+        }
+    } else if (release_combo_key(data->position, data->timestamp)) {
         return ZMK_EV_EVENT_HANDLED;
     }
-    if (released_keys > 1) {
-        // The second and further key down events are re-raised. To preserve
-        // correct order for e.g. hold-taps, reraise the key up event too.
-        struct zmk_position_state_changed_event dupe_ev =
-            copy_raised_zmk_position_state_changed(data);
-        ZMK_EVENT_RAISE(dupe_ev);
-        return ZMK_EV_EVENT_CAPTURED;
-    }
+
     return ZMK_EV_EVENT_BUBBLE;
 }
 
