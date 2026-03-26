@@ -79,6 +79,16 @@ __attribute__((weak)) bool zmk_behavior_hold_tap_position_is_active(uint32_t pos
     return false;
 }
 
+__attribute__((weak)) bool zmk_behavior_momentary_layer_position_is_active(uint32_t position) {
+    (void)position;
+    return false;
+}
+
+__attribute__((weak)) bool zmk_behavior_key_press_position_is_active_modifier(uint32_t position) {
+    (void)position;
+    return false;
+}
+
 struct k_work_delayable timeout_task;
 int64_t timeout_task_timeout_at;
 
@@ -483,8 +493,11 @@ static int position_state_down(const zmk_event_t *ev, struct zmk_position_state_
 }
 
 static int position_state_up(const zmk_event_t *ev, struct zmk_position_state_changed *data) {
+    // Flush queued combo keydowns before releases that can change key interpretation reach keymap.
     bool should_cleanup = is_key_part_of_candidate(data->position) ||
-                          zmk_behavior_hold_tap_position_is_active(data->position);
+                          zmk_behavior_hold_tap_position_is_active(data->position) ||
+                          zmk_behavior_momentary_layer_position_is_active(data->position) ||
+                          zmk_behavior_key_press_position_is_active_modifier(data->position);
 
     if (should_cleanup) {
         int released_keys = cleanup();

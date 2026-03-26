@@ -12,6 +12,7 @@
 
 #include <zmk/keymap.h>
 #include <zmk/behavior.h>
+#include <zmk/matrix.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -39,21 +40,43 @@ static const struct behavior_parameter_metadata metadata = {
 struct behavior_mo_config {};
 struct behavior_mo_data {};
 
+static bool active_mo_positions[ZMK_KEYMAP_LEN];
+
+bool zmk_behavior_momentary_layer_position_is_active(uint32_t position) {
+    if (position >= ZMK_KEYMAP_LEN) {
+        return false;
+    }
+
+    return active_mo_positions[position];
+}
+
 static int behavior_mo_init(const struct device *dev) { return 0; };
 
 static int mo_keymap_binding_pressed(struct zmk_behavior_binding *binding,
                                      struct zmk_behavior_binding_event event) {
     LOG_DBG("position %d layer %d", event.position, binding->param1);
+    int ret;
 #if IS_ENABLED(CONFIG_ZMK_TRACK_MOMENTARY_LAYERS)
-    return zmk_keymap_layer_activate(binding->param1, true);
+    ret = zmk_keymap_layer_activate(binding->param1, true);
 #else
-    return zmk_keymap_layer_activate(binding->param1);
+    ret = zmk_keymap_layer_activate(binding->param1);
 #endif
+
+    if (ret == 0 && event.position < ZMK_KEYMAP_LEN) {
+        active_mo_positions[event.position] = true;
+    }
+
+    return ret;
 }
 
 static int mo_keymap_binding_released(struct zmk_behavior_binding *binding,
                                       struct zmk_behavior_binding_event event) {
     LOG_DBG("position %d layer %d", event.position, binding->param1);
+
+    if (event.position < ZMK_KEYMAP_LEN) {
+        active_mo_positions[event.position] = false;
+    }
+
     return zmk_keymap_layer_deactivate(binding->param1);
 }
 
